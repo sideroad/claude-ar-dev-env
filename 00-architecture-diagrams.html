@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR開発環境 構成図</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; border-bottom: 2px solid #007acc; padding-bottom: 10px; }
+        h2 { color: #007acc; margin-top: 40px; }
+        .mermaid { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .description {
+            background: #e8f4fc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕶️ AR開発環境 構成図</h1>
+
+    <!-- 1. 全体構成 -->
+    <h2>1. 全体構成</h2>
+    <div class="description">
+        ハードウェアからクラウドまでの全体接続図。案件ごとにEC2を分離。
+    </div>
+    <div class="mermaid">
+flowchart TB
+    subgraph User["👤 ユーザー装備"]
+        XREAL["🕶️ XREAL One Pro\nAR表示（広視野角）"]
+        LinkBuds["🎧 LinkBuds\n音声入力"]
+        Keyboard["⌨️ ProtoArc XK01 TP\nキーボード+トラックパッド"]
+        Battery["🔋 モバイルバッテリー\n10000mAh"]
+    end
+
+    subgraph BeamPro["📱 Beam Pro"]
+        Termius["Termius\nSSH（1接続のみ）"]
+        Chrome["Chrome\nブラウザ"]
+        Tailscale_App["Tailscale\nVPN"]
+    end
+
+    subgraph Cloud["☁️ AWS"]
+        subgraph Control["🎮 ar-dev-control（常時起動）"]
+            CtrlTmux["tmux [ctrl]"]
+            CtrlAWS["AWS CLI\nEC2起動/停止"]
+        end
+        subgraph EC2_A["🟢 ar-dev-acme-server"]
+            Claude_A["Claude Code"]
+            Tmux_A["tmux"]
+            Tunnel_A["Cloudflare Tunnel"]
+        end
+        subgraph EC2_B["🟡 ar-dev-beta-server"]
+            Claude_B["Claude Code"]
+            Tmux_B["tmux"]
+            Tunnel_B["Cloudflare Tunnel"]
+        end
+    end
+
+    subgraph Home["🏠 自宅"]
+        Mac["🔵 MacBook Pro\n特定案件用"]
+    end
+
+    XREAL <-->|USB-C| BeamPro
+    LinkBuds <-->|Bluetooth| BeamPro
+    Keyboard <-->|Bluetooth| BeamPro
+    Battery -->|給電| BeamPro
+
+    Termius -->|SSH| Control
+    Control -->|SSH Alt で切替| EC2_A
+    Control -->|SSH| EC2_B
+    Control -->|Tailscale| Mac
+    CtrlAWS -->|起動/停止| EC2_A
+    CtrlAWS -->|起動/停止| EC2_B
+    Chrome -->|HTTPS| Tunnel_A
+    Chrome -->|HTTPS| Tunnel_B
+    </div>
+
+    <!-- 2. EC2内部構成 -->
+    <h2>2. EC2内部構成</h2>
+    <div class="description">
+        各EC2インスタンス内のツール構成とtmux/サービス構成。
+    </div>
+    <div class="mermaid">
+flowchart TB
+    subgraph EC2["EC2インスタンス（案件ごと）"]
+        subgraph Tools["インストール済みツール"]
+            AWS_CLI["AWS CLI"]
+            NodeJS["Node.js fnm"]
+            GH["GitHub CLI"]
+            Playwright["Playwright"]
+            Cloudflared["cloudflared"]
+            CodeServer["code-server"]
+        end
+
+        subgraph Tmux["tmux セッション（各Window = Claude Code）"]
+            Win1["Window 1: main\nClaude Code"]
+            Win2["Window 2: feature/xxx\nClaude Code"]
+            Win3["Window 3: ...\nClaude Code"]
+        end
+
+        subgraph Background["バックグラウンドサービス"]
+            DevServer["開発サーバー\nnohup npm run dev"]
+            Tunnel["Cloudflare Tunnel\nnohup cloudflared"]
+        end
+
+        subgraph Services["systemd サービス"]
+            AutoStop["auto-stop.service\nアイドル検知→自動停止"]
+            CodeSvc["code-server.service"]
+        end
+
+        IAMRole["IAMロール\n他環境操作権限"]
+    end
+
+    subgraph External["外部サービス"]
+        GitHub["GitHub\nリポジトリ"]
+        CF["Cloudflare\nTunnel URL発行"]
+        Staging["ステージング環境"]
+        Prod["本番環境"]
+    end
+
+    GH <-->|認証済み| GitHub
+    Cloudflared <-->|Tunnel| CF
+    AWS_CLI -->|ログ確認・操作| Staging
+    AWS_CLI -->|ログ確認・操作| Prod
+    AutoStop -->|SSH切断後3時間| EC2
+    </div>
+
+    <!-- 3. 作業分担 -->
+    <h2>3. 作業分担</h2>
+    <div class="description">
+        人の作業（認証のみ）とClaude Codeの作業範囲。
+    </div>
+    <div class="mermaid">
+flowchart LR
+    subgraph Human["👤 人の作業（認証のみ）"]
+        H1["ハードウェア\n購入・接続"]
+        H2["aws login"]
+        H3["gh auth login"]
+        H4["cloudflared\ntunnel login"]
+        H5["tailscale up"]
+    end
+
+    subgraph Claude["🤖 Claude Code作業"]
+        C1["EC2作成・削除"]
+        C2["IAMロール作成\n自動認証"]
+        C3["環境構築"]
+        C4["GitHub操作\nclone/PR/merge"]
+        C5["開発サーバー操作\ntmux経由"]
+        C6["障害調査\nログ・メトリクス"]
+    end
+
+    subgraph Auto["⚙️ 自動"]
+        A1["SSH切断後3時間で\nEC2自動停止"]
+    end
+
+    H2 -->|認証後| C1
+    C1 --> C2
+    H3 -->|認証後| C4
+    H4 -->|認証後| C5
+    C5 --> A1
+    </div>
+
+    <!-- 4. 案件ライフサイクル -->
+    <h2>4. 案件ライフサイクル</h2>
+    <div class="description">
+        新規案件セットアップから日次運用、終了までの流れ。
+    </div>
+    <div class="mermaid">
+flowchart TB
+    subgraph Setup["セットアップ（初回）"]
+        S1["03-claude-code-new-project-setup.md\nを渡す"]
+        S2["案件情報入力\nクライアント名等"]
+        S3["EC2作成\n自動実行"]
+        S4["環境構築\n自動実行"]
+        S5["認証作業\nGitHub/Cloudflare"]
+        S6["動作確認"]
+    end
+
+    subgraph Daily["日次運用"]
+        D1["EC2起動"]
+        D2["tmux接続"]
+        D3["開発作業\nClaude Codeに依頼"]
+        D4["SSH切断"]
+        D5["SSH切断後\n3時間で自動停止"]
+    end
+
+    subgraph End["案件終了"]
+        E1["リソース削除\nEC2/SG/IAM等"]
+    end
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6
+    S6 --> Daily
+    D1 --> D2 --> D3 --> D4 --> D5
+    D5 -.->|翌日| D1
+    Daily --> E1
+    </div>
+
+    <!-- 5. 自動停止判定ロジック -->
+    <h2>5. 自動停止判定ロジック</h2>
+    <div class="description">
+        SSH切断後3時間で自動停止。シンプルで複数案件の切り替えに対応。
+    </div>
+    <div class="mermaid">
+flowchart TB
+    Start["5分ごとにチェック"]
+    
+    SSH{"SSH接続\nあり？"}
+    
+    Active["✅ 接続中\nタイマーリセット"]
+    Idle["⏳ 未接続\nタイマー継続"]
+    
+    Check3h{"3時間\n経過？"}
+    Stop["🛑 EC2停止"]
+
+    Start --> SSH
+    SSH -->|はい| Active
+    SSH -->|いいえ| Idle
+    
+    Idle --> Check3h
+    Check3h -->|いいえ| Start
+    Check3h -->|はい| Stop
+    Active --> Start
+    </div>
+    <div class="description">
+        <strong>ポイント:</strong> SSH接続の有無のみで判定。Claude Codeに依頼して離席しても3時間は停止しない。
+    </div>
+
+    <!-- 6. コスト比較 -->
+    <h2>6. コスト比較（月額）</h2>
+    <div class="description">
+        24時間稼働 vs 自動停止運用のコスト比較。約68%削減。
+    </div>
+    <div style="display: flex; gap: 40px; flex-wrap: wrap;">
+        <div class="mermaid">
+pie showData
+    title 24時間稼働 $11.1/月（スポット）
+    "EC2 t4g.small スポット" : 5.0
+    "EBS 30GB" : 2.88
+        </div>
+        <div class="mermaid">
+pie showData
+    title 自動停止運用 約$7/月
+    "EC2 実稼働分" : 4
+    "EBS 30GB" : 2.88
+        </div>
+    </div>
+
+    <!-- 7. ファイル構成 -->
+    <h2>7. ドキュメント構成</h2>
+    <div class="description">
+        3つのmdファイルの役割と使用タイミング。
+    </div>
+    <div class="mermaid">
+flowchart LR
+    subgraph Docs["ドキュメント"]
+        Doc1["01-human-prerequisites.md\n👤 事前作業ガイド"]
+        Doc2["03-claude-code-new-project-setup.md\n🤖 新規セットアップ"]
+        Doc3["04-claude-code-operations.md\n🤖 運用タスク集"]
+    end
+
+    Human["👤 人"] -->|読んで実行| Doc1
+    Doc1 -->|完了後| Doc2
+    Doc2 -->|渡す| CC["🤖 Claude Code"]
+    CC -->|自動実行| Setup["セットアップ完了"]
+    Setup --> Doc3
+    Doc3 -->|日常運用で使用| CC
+    </div>
+
+    <!-- 8. ネットワーク構成 -->
+    <h2>8. ネットワーク構成</h2>
+    <div class="description">
+        Cloudflare Tunnel / Tailscale / AWS の接続構成。
+    </div>
+    <div class="mermaid">
+flowchart TB
+    subgraph Internet["インターネット"]
+        CF_Edge["Cloudflare Edge"]
+    end
+
+    subgraph AWS_Region["AWS ap-northeast-1"]
+        subgraph VPC["Default VPC"]
+            subgraph EC2_SG["Security Group\nSSH許可"]
+                EC2["EC2インスタンス\nElastic IP付与"]
+            end
+        end
+        CW["CloudWatch Logs"]
+        S3["S3 ログ"]
+    end
+
+    subgraph Home["自宅ネットワーク"]
+        Mac["MacBook Pro"]
+        TS_Relay["Tailscale DERP"]
+    end
+
+    subgraph Mobile["モバイル"]
+        BeamPro["Beam Pro\n4G/5G or WiFi"]
+    end
+
+    BeamPro -->|SSH:22| EC2
+    BeamPro -->|HTTPS| CF_Edge
+    CF_Edge -->|Tunnel| EC2
+    BeamPro -->|Tailscale| TS_Relay
+    TS_Relay -->|Tailscale| Mac
+    EC2 -->|IAMロール| CW
+    EC2 -->|IAMロール| S3
+    </div>
+
+    <!-- 9. AWS権限構成 -->
+    <h2>9. AWS権限構成（3段階）</h2>
+    <div class="description">
+        ルートユーザー → 管理者IAMユーザー → EC2用IAMロール の3段階構成。
+    </div>
+    <div class="mermaid">
+flowchart TB
+    subgraph Level1["レベル1: ルートユーザー"]
+        Root["🔐 ルートユーザー\n全権限"]
+    end
+
+    subgraph Level2["レベル2: 管理者IAMユーザー"]
+        Admin["👤 管理者IAMユーザー\nAdministratorAccess"]
+    end
+
+    subgraph Level3["レベル3: EC2用IAMロール"]
+        Role["🎫 IAMロール\n必要最小限の権限"]
+    end
+
+    Root -->|初回のみ作成\n以降ルートは封印| Admin
+    Admin -->|案件ごとに作成\naws login で認証| Role
+    Role -->|アタッチ\n自動認証| EC2["☁️ EC2インスタンス"]
+    </div>
+
+    <div class="description">
+        <table style="width:100%; border-collapse: collapse; margin-top: 20px;">
+            <tr style="background: #007acc; color: white;">
+                <th style="padding: 10px; border: 1px solid #ddd;">レベル</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">ユーザー</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">用途</th>
+                <th style="padding: 10px; border: 1px solid #ddd;">認証</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">1</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">ルートユーザー</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">初期設定のみ</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">MFA必須、封印</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px; border: 1px solid #ddd;">2</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">管理者IAMユーザー</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">EC2作成、IAMロール作成</td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><code>aws login</code></td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">3</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">EC2用IAMロール</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">EC2内からのAWS操作</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">自動（設定不要）</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- 10. コントロールEC2 -->
+    <h2>10. コントロールEC2からの案件管理</h2>
+    <div class="description">
+        キーボードだけで全操作完結。Beam Pro に触る必要なし。
+    </div>
+    <div class="mermaid">
+flowchart LR
+    subgraph BeamPro["📱 Beam Pro"]
+        Termius["Termius\n1接続のみ"]
+    end
+
+    subgraph AWS["☁️ AWS"]
+        subgraph Control["🎮 コントロールEC2\n常時起動"]
+            tmux["tmux [ctrl]"]
+            scripts["管理スクリプト"]
+        end
+        EC2_A["🟢 案件A EC2"]
+        EC2_B["🟡 案件B EC2"]
+    end
+
+    Termius -->|SSH| Control
+    tmux -->|Alt| EC2_A
+    tmux -->|Alt| EC2_B
+    scripts -->|AWS CLI| EC2_A
+    scripts -->|AWS CLI| EC2_B
+    </div>
+
+    <div class="description">
+        <h4>管理コマンド（コントロールEC2内）</h4>
+        <table style="width:100%; border-collapse: collapse; margin-top: 10px;">
+            <tr style="background: #007acc; color: white;">
+                <th style="padding: 8px; border: 1px solid #ddd;">コマンド</th>
+                <th style="padding: 8px; border: 1px solid #ddd;">用途</th>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>list-projects</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">案件一覧</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>start-project XX</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">案件XX起動</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>stop-project XX</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">案件XX停止</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>start-all</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">全案件起動</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>stop-all</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">全案件停止</td>
+            </tr>
+        </table>
+        <h4 style="margin-top: 20px;">tmux window切り替え（Beam Pro対応）</h4>
+        <table style="width:100%; border-collapse: collapse; margin-top: 10px;">
+            <tr style="background: #007acc; color: white;">
+                <th style="padding: 8px; border: 1px solid #ddd;">場所</th>
+                <th style="padding: 8px; border: 1px solid #ddd;">操作</th>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">コントロールEC2</td>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>Alt + ]</code> / <code>Alt + [</code> で案件切り替え</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;">作業用EC2</td>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>Alt + Shift + ]</code> / <code>Alt + Shift + [</code> でブランチ切り替え</td>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+    </script>
+</body>
+</html>

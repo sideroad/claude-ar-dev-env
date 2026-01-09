@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR開発環境 構成図 - D3.js版</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+        }
+
+        .tab-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 30px;
+            padding: 0 20px;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: #aaa;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .diagram-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            min-height: 600px;
+        }
+
+        .diagram-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ノードスタイル */
+        .node {
+            cursor: pointer;
+        }
+
+        .node rect {
+            transition: all 0.3s ease;
+        }
+
+        .node:hover rect {
+            filter: brightness(1.2) drop-shadow(0 0 15px rgba(255,255,255,0.4));
+        }
+
+        .node-label {
+            font-size: 11px;
+            font-weight: 600;
+            fill: #fff;
+            text-anchor: middle;
+        }
+
+        .node-sublabel {
+            font-size: 9px;
+            fill: rgba(255,255,255,0.7);
+            text-anchor: middle;
+        }
+
+        .node-emoji {
+            font-size: 18px;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        /* リンクスタイル - 曲線対応 */
+        .link {
+            fill: none;
+            stroke: #4a5568;
+            stroke-width: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .link:hover {
+            stroke: #667eea;
+            stroke-width: 3px;
+        }
+
+        .link-label {
+            font-size: 10px;
+            fill: #aaa;
+            text-anchor: middle;
+        }
+
+        .group-label {
+            font-size: 13px;
+            font-weight: 700;
+            fill: #fff;
+            opacity: 0.9;
+        }
+
+        /* ツールチップ */
+        .tooltip {
+            position: absolute;
+            background: rgba(26, 26, 46, 0.95);
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            max-width: 280px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip h3 {
+            margin: 0 0 8px 0;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .tooltip p {
+            margin: 0;
+            color: #aaa;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        /* パイチャート */
+        .pie-container {
+            display: flex;
+            justify-content: center;
+            gap: 80px;
+            flex-wrap: wrap;
+            padding: 20px;
+        }
+
+        .pie-chart {
+            text-align: center;
+        }
+
+        .pie-title {
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AR開発環境 構成図</h1>
+            <p class="subtitle">Interactive D3.js Architecture Diagrams</p>
+        </header>
+
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="overall">1. 全体構成</button>
+            <button class="tab-btn" data-tab="ec2-internal">2. EC2内部構成</button>
+            <button class="tab-btn" data-tab="work-division">3. 作業分担</button>
+            <button class="tab-btn" data-tab="lifecycle">4. ライフサイクル</button>
+            <button class="tab-btn" data-tab="auto-stop">5. 自動停止</button>
+            <button class="tab-btn" data-tab="cost">6. コスト</button>
+            <button class="tab-btn" data-tab="file-structure">7. ファイル構成</button>
+            <button class="tab-btn" data-tab="network">8. ネットワーク</button>
+            <button class="tab-btn" data-tab="aws-permission">9. AWS権限</button>
+            <button class="tab-btn" data-tab="control-mgmt">10. 案件管理</button>
+        </nav>
+
+        <div class="diagram-container">
+            <div id="overall" class="tab-content active">
+                <h2 class="diagram-title">🏗️ 全体構成</h2>
+                <div id="diagram-overall"></div>
+            </div>
+
+            <div id="ec2-internal" class="tab-content">
+                <h2 class="diagram-title">🖥️ EC2内部構成</h2>
+                <div id="diagram-ec2-internal"></div>
+            </div>
+
+            <div id="work-division" class="tab-content">
+                <h2 class="diagram-title">👥 作業分担</h2>
+                <div id="diagram-work-division"></div>
+            </div>
+
+            <div id="lifecycle" class="tab-content">
+                <h2 class="diagram-title">🔄 案件ライフサイクル</h2>
+                <div id="diagram-lifecycle"></div>
+            </div>
+
+            <div id="auto-stop" class="tab-content">
+                <h2 class="diagram-title">⏱️ 自動停止判定ロジック</h2>
+                <div id="diagram-auto-stop"></div>
+            </div>
+
+            <div id="cost" class="tab-content">
+                <h2 class="diagram-title">💰 コスト構造</h2>
+                <div id="diagram-cost"></div>
+            </div>
+
+            <div id="file-structure" class="tab-content">
+                <h2 class="diagram-title">📁 ファイル構成</h2>
+                <div id="diagram-file-structure"></div>
+            </div>
+
+            <div id="network" class="tab-content">
+                <h2 class="diagram-title">🌐 ネットワーク構成</h2>
+                <div id="diagram-network"></div>
+            </div>
+
+            <div id="aws-permission" class="tab-content">
+                <h2 class="diagram-title">🔐 AWS権限構成（3段階）</h2>
+                <div id="diagram-aws-permission"></div>
+            </div>
+
+            <div id="control-mgmt" class="tab-content">
+                <h2 class="diagram-title">🎮 コントロールEC2からの案件管理</h2>
+                <div id="diagram-control-mgmt"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // ========================================
+        // タブ切り替え
+        // ========================================
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // ========================================
+        // 共通設定
+        // ========================================
+        const width = 1100;
+        const height = 520;
+        const tooltip = d3.select("#tooltip");
+
+        // カラーパレット（5-7色に制限）
+        const colors = {
+            device: "#9C27B0",      // 紫: ハードウェア
+            app: "#2196F3",         // 青: アプリケーション
+            aws: "#FF9800",         // オレンジ: AWS
+            service: "#4CAF50",     // 緑: サービス
+            external: "#E91E63",    // ピンク: 外部サービス
+            auto: "#607D8B",        // グレー: 自動処理
+        };
+
+        // グループ背景色（低彩度）
+        const groupBg = {
+            device: "rgba(156, 39, 176, 0.12)",
+            app: "rgba(33, 150, 243, 0.12)",
+            aws: "rgba(255, 152, 0, 0.12)",
+            home: "rgba(76, 175, 80, 0.12)",
+        };
+
+        // ========================================
+        // ユーティリティ関数
+        // ========================================
+
+        // 曲線パス生成（交差回避用）
+        function curvedPath(x1, y1, x2, y2, curvature = 0.2) {
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            // 垂直方向にオフセット
+            const offsetX = -dy * curvature;
+            const offsetY = dx * curvature;
+            const ctrlX = midX + offsetX;
+            const ctrlY = midY + offsetY;
+            return `M${x1},${y1} Q${ctrlX},${ctrlY} ${x2},${y2}`;
+        }
+
+        // 直線パス生成
+        function straightPath(x1, y1, x2, y2) {
+            return `M${x1},${y1} L${x2},${y2}`;
+        }
+
+        // 矢印マーカー追加
+        function addArrowMarker(svg, id, color = "#4a5568") {
+            svg.append("defs").append("marker")
+                .attr("id", id)
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 8)
+                .attr("refY", 0)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-4L10,0L0,4")
+                .attr("fill", color);
+        }
+
+        // ノード描画（共通化）
+        function drawNode(g, node, showSublabel = true) {
+            const nodeG = g.append("g")
+                .attr("class", "node")
+                .attr("transform", `translate(${node.x}, ${node.y})`);
+
+            // 背景
+            nodeG.append("rect")
+                .attr("width", node.w || 110)
+                .attr("height", node.h || 50)
+                .attr("x", -(node.w || 110) / 2)
+                .attr("y", -(node.h || 50) / 2)
+                .attr("rx", 10)
+                .attr("fill", node.color)
+                .style("filter", "drop-shadow(3px 3px 6px rgba(0,0,0,0.3))");
+
+            // アイコン（絵文字）
+            if (node.emoji) {
+                nodeG.append("text")
+                    .attr("class", "node-emoji")
+                    .attr("y", showSublabel ? -8 : -2)
+                    .text(node.emoji);
+            }
+
+            // ラベル
+            nodeG.append("text")
+                .attr("class", "node-label")
+                .attr("y", node.emoji ? (showSublabel ? 8 : 12) : 0)
+                .text(node.label);
+
+            // サブラベル
+            if (showSublabel && node.sublabel) {
+                nodeG.append("text")
+                    .attr("class", "node-sublabel")
+                    .attr("y", 20)
+                    .text(node.sublabel);
+            }
+
+            // ツールチップ
+            nodeG.on("mouseenter", (event) => {
+                tooltip
+                    .html(`<h3>${node.emoji || ''} ${node.label}</h3><p>${node.sublabel || node.desc || ''}</p>`)
+                    .style("left", (event.pageX + 15) + "px")
+                    .style("top", (event.pageY - 10) + "px")
+                    .classed("visible", true);
+            })
+            .on("mouseleave", () => tooltip.classed("visible", false));
+
+            return nodeG;
+        }
+
+        // グループ背景描画
+        function drawGroup(g, group) {
+            g.append("rect")
+                .attr("x", group.x)
+                .attr("y", group.y)
+                .attr("width", group.w)
+                .attr("height", group.h)
+                .attr("rx", 14)
+                .attr("fill", group.fill)
+                .attr("stroke", group.stroke || group.fill.replace("0.12", "0.4"))
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", group.dashed ? "6,4" : "none");
+
+            g.append("text")
+                .attr("x", group.x + 14)
+                .attr("y", group.y + 24)
+                .attr("class", "group-label")
+                .text(group.label);
+        }
+
+        // ========================================
+        // 1. 全体構成図（階層型レイアウト - 左→右フロー徹底）
+        // ========================================
+        function drawOverallDiagram() {
+            const container = d3.select("#diagram-overall");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, 980, 340])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "340px");
+
+            addArrowMarker(svg, "arrow-overall");
+
+            const g = svg.append("g").attr("transform", "translate(20, 20)");
+
+            // ===== コンパクトなレイアウト（左→右フロー）=====
+
+            // グループ背景
+            const groups = [
+                { label: "👤 ユーザー装備", x: 0, y: 30, w: 120, h: 200, fill: groupBg.device, dashed: true },
+                { label: "📱 Beam Pro", x: 135, y: 50, w: 100, h: 150, fill: groupBg.app, dashed: true },
+                { label: "☁️ AWS", x: 250, y: 0, w: 480, h: 290, fill: groupBg.aws, dashed: false },
+                { label: "🌐 外部", x: 750, y: 30, w: 130, h: 200, fill: groupBg.home, dashed: true },
+            ];
+            groups.forEach(grp => drawGroup(g, grp));
+
+            // Control EC2 グループ
+            g.append("rect")
+                .attr("x", 270)
+                .attr("y", 40)
+                .attr("width", 170)
+                .attr("height", 130)
+                .attr("rx", 10)
+                .attr("fill", "rgba(255, 152, 0, 0.2)")
+                .attr("stroke", "rgba(255, 152, 0, 0.6)")
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", "6,4");
+
+            g.append("text")
+                .attr("x", 280)
+                .attr("y", 60)
+                .attr("class", "group-label")
+                .style("font-size", "10px")
+                .text("🎮 ar-dev-control");
+
+            // ノード定義（コンパクト配置）
+            const nodes = [
+                // Layer 0: ユーザー装備
+                { id: "xreal", label: "XREAL", sublabel: "AR表示", x: 60, y: 75, color: colors.device, emoji: "🕶️", w: 80, h: 40 },
+                { id: "linkbuds", label: "LinkBuds", sublabel: "音声", x: 60, y: 125, color: colors.device, emoji: "🎧", w: 80, h: 40 },
+                { id: "keyboard", label: "XK01 TP", sublabel: "KB", x: 60, y: 175, color: colors.device, emoji: "⌨️", w: 80, h: 40 },
+
+                // Layer 1: Beam Pro
+                { id: "termius", label: "Termius", x: 185, y: 100, color: colors.app, emoji: "💻", w: 80, h: 40 },
+                { id: "chrome", label: "Chrome", x: 185, y: 155, color: colors.app, emoji: "🌐", w: 80, h: 40 },
+
+                // Layer 2: Control EC2内部
+                { id: "tmux", label: "tmux", sublabel: "セッション", x: 355, y: 85, color: colors.aws, emoji: "📺", w: 90, h: 40 },
+                { id: "awscli", label: "AWS CLI", sublabel: "起動/停止", x: 355, y: 140, color: colors.aws, emoji: "⚡", w: 90, h: 40 },
+
+                // Layer 3: 案件EC2
+                { id: "ec2a", label: "ar-dev-acme", sublabel: "🟢 稼働中", x: 530, y: 55, color: colors.aws, emoji: "🖥️", w: 110, h: 45 },
+                { id: "ec2b", label: "ar-dev-beta", sublabel: "🟡 稼働中", x: 530, y: 120, color: colors.aws, emoji: "🖥️", w: 110, h: 45 },
+                { id: "ec2c", label: "ar-dev-gamma", sublabel: "⚫ 停止", x: 530, y: 185, color: colors.auto, emoji: "🖥️", w: 110, h: 45 },
+
+                // Layer 4: 外部サービス
+                { id: "tunnel", label: "Cloudflare", sublabel: "Tunnel", x: 815, y: 85, color: colors.external, emoji: "☁️", w: 100, h: 45 },
+                { id: "mac", label: "MacBook", sublabel: "Tailscale", x: 815, y: 185, color: colors.service, emoji: "💻", w: 100, h: 45 },
+            ];
+
+            const nodeMap = {};
+            nodes.forEach(n => nodeMap[n.id] = n);
+
+            // エッジ定義
+            const edges = [
+                // ユーザー装備 → Beam Pro はグループ間矢印として個別に描画
+
+                // Beam Pro → Control EC2
+                { source: "termius", target: "tmux", label: "SSH", curve: 0 },
+                // Chrome → Cloudflare は個別にオーソゴナルパスで描画（AWS境界の下を迂回）
+
+                // Control EC2 → 案件EC2
+                { source: "tmux", target: "ec2a", label: "", curve: -0.08 },
+                { source: "tmux", target: "ec2b", label: "Alt+]", curve: 0 },
+                { source: "tmux", target: "ec2c", label: "", curve: 0.08 },
+
+                { source: "awscli", target: "ec2a", label: "", curve: 0.1 },
+                { source: "awscli", target: "ec2b", label: "", curve: 0 },
+                { source: "awscli", target: "ec2c", label: "", curve: -0.08 },
+
+                // 案件EC2 → Cloudflare
+                { source: "ec2a", target: "tunnel", label: "", curve: -0.05 },
+                { source: "ec2b", target: "tunnel", label: "Tunnel", curve: 0.05 },
+
+            ];
+
+            // エッジ描画（Tailscale以外）
+            edges.forEach(edge => {
+                const s = nodeMap[edge.source];
+                const t = nodeMap[edge.target];
+                const sw = (s.w || 90) / 2;
+                const tw = (t.w || 90) / 2;
+                const sx = s.x + sw;
+                const sy = s.y;
+                const tx = t.x - tw;
+                const ty = t.y;
+
+                const path = edge.curve !== 0
+                    ? curvedPath(sx, sy, tx, ty, edge.curve)
+                    : straightPath(sx, sy, tx, ty);
+
+                g.append("path")
+                    .attr("class", "link")
+                    .attr("d", path)
+                    .attr("marker-end", "url(#arrow-overall)");
+
+                if (edge.label) {
+                    const mx = (sx + tx) / 2;
+                    const my = (sy + ty) / 2 + (edge.curve * 30);
+                    g.append("text")
+                        .attr("class", "link-label")
+                        .attr("x", mx)
+                        .attr("y", my - 6)
+                        .style("font-size", "9px")
+                        .text(edge.label);
+                }
+            });
+
+            // ユーザー装備 → Beam Pro（グループ間矢印、1本に集約）
+            // グループ: ユーザー装備 x=0-120, Beam Pro x=135-235
+            const userEquipRight = 120;  // ユーザー装備グループ右端
+            const beamProLeft = 135;     // Beam Proグループ左端
+            const groupConnectY = 125;   // 接続のY座標（LinkBudsと同じ高さ）
+
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", straightPath(userEquipRight, groupConnectY, beamProLeft, groupConnectY))
+                .attr("stroke-width", 3)  // グループ間は太めに
+                .attr("marker-end", "url(#arrow-overall)");
+
+            // Tailscale矢印（シンプルなオーソゴナルパス）
+            const tmux = nodeMap["tmux"];
+            const mac = nodeMap["mac"];
+            const tmuxRight = tmux.x + tmux.w / 2;  // 400
+            const awsRight = 730 + 15;  // AWS境界(250+480) + オフセット
+            const macLeft = mac.x - mac.w / 2;  // 765
+            const macY = mac.y;  // 185
+
+            // tmux右端 → 水平に右 → 下へmacY → 右へMacBook
+            const tailscalePath = `M${tmuxRight},${tmux.y} L${awsRight},${tmux.y} L${awsRight},${macY} L${macLeft},${macY}`;
+
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", tailscalePath)
+                .attr("stroke-dasharray", "4,3")
+                .attr("marker-end", "url(#arrow-overall)");
+
+            // Tailscaleラベル
+            g.append("text")
+                .attr("class", "link-label")
+                .attr("x", awsRight + 15)
+                .attr("y", (tmux.y + macY) / 2)
+                .style("font-size", "9px")
+                .text("Tailscale");
+
+            // Chrome → Cloudflare（AWS境界の下を迂回し、右側から接続）
+            const chrome = nodeMap["chrome"];
+            const cloudflare = nodeMap["tunnel"];
+            const chromeX = chrome.x;  // Chromeの中央X
+            const chromeBottom = chrome.y + chrome.h / 2;  // Chromeの下端
+            const awsBottom = 290 + 15;  // AWS下端 + オフセット
+            const cloudflareRight = cloudflare.x + cloudflare.w / 2 + 35;  // Cloudflareの右端 + オフセット（境界から離す）
+            const cloudflareY = cloudflare.y;
+
+            // Chrome下端 → 下へ → AWS境界の下 → 右へ → Cloudflare右側 → 上へ → 右から接続
+            const chromePath = `M${chromeX},${chromeBottom} L${chromeX},${awsBottom} L${cloudflareRight},${awsBottom} L${cloudflareRight},${cloudflareY} L${cloudflare.x + cloudflare.w/2},${cloudflareY}`;
+
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", chromePath)
+                .attr("marker-end", "url(#arrow-overall)");
+
+            // HTTPSラベル
+            g.append("text")
+                .attr("class", "link-label")
+                .attr("x", (chromeX + cloudflareRight) / 2)
+                .attr("y", awsBottom - 5)
+                .style("font-size", "9px")
+                .text("HTTPS");
+
+            // ノード描画
+            nodes.forEach(node => drawNode(g, node));
+        }
+
+        // ========================================
+        // 2. EC2内部構成図
+        // ========================================
+        function drawEC2InternalDiagram() {
+            const container = d3.select("#diagram-ec2-internal");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, width, height])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "520px");
+
+            const g = svg.append("g").attr("transform", "translate(20, 20)");
+
+            // メインEC2ボックス
+            g.append("rect")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("width", 750)
+                .attr("height", 460)
+                .attr("rx", 16)
+                .attr("fill", groupBg.aws)
+                .attr("stroke", "rgba(255, 152, 0, 0.5)")
+                .attr("stroke-width", 2);
+
+            g.append("text")
+                .attr("x", 20)
+                .attr("y", 35)
+                .attr("class", "group-label")
+                .style("font-size", "16px")
+                .text("🖥️ EC2インスタンス（案件ごと）");
+
+            // サブグループ
+            const subGroups = [
+                { label: "🔧 インストール済みツール", x: 20, y: 55, w: 350, h: 180, fill: groupBg.app },
+                { label: "📺 tmux セッション", x: 390, y: 55, w: 340, h: 180, fill: "rgba(76, 175, 80, 0.12)" },
+                { label: "⚙️ systemd サービス", x: 20, y: 255, w: 350, h: 100, fill: "rgba(156, 39, 176, 0.12)" },
+                { label: "🔑 IAMロール", x: 390, y: 255, w: 340, h: 60, fill: "rgba(244, 67, 54, 0.12)" },
+            ];
+            subGroups.forEach(grp => {
+                g.append("rect")
+                    .attr("x", grp.x)
+                    .attr("y", grp.y)
+                    .attr("width", grp.w)
+                    .attr("height", grp.h)
+                    .attr("rx", 10)
+                    .attr("fill", grp.fill)
+                    .attr("stroke", grp.fill.replace("0.12", "0.4"))
+                    .attr("stroke-dasharray", "6,4");
+
+                g.append("text")
+                    .attr("x", grp.x + 14)
+                    .attr("y", grp.y + 24)
+                    .attr("class", "group-label")
+                    .style("font-size", "12px")
+                    .text(grp.label);
+            });
+
+            // ツール
+            const tools = [
+                { label: "AWS CLI", x: 80, y: 120, color: colors.app, emoji: "☁️", w: 90, h: 40 },
+                { label: "Node.js", x: 185, y: 120, color: colors.service, emoji: "📦", w: 90, h: 40 },
+                { label: "GitHub CLI", x: 290, y: 120, color: colors.auto, emoji: "🐙", w: 90, h: 40 },
+                { label: "Playwright", x: 80, y: 175, color: colors.service, emoji: "🎭", w: 90, h: 40 },
+                { label: "cloudflared", x: 185, y: 175, color: colors.external, emoji: "☁️", w: 90, h: 40 },
+                { label: "code-server", x: 290, y: 175, color: colors.app, emoji: "📝", w: 90, h: 40 },
+            ];
+            tools.forEach(t => drawNode(g, t, false));
+
+            // tmuxペイン
+            const panes = [
+                { label: "ペイン 0", sublabel: "開発サーバー", x: 470, y: 120, color: colors.service, emoji: "🚀", w: 100, h: 45 },
+                { label: "ペイン 1", sublabel: "Tunnel (アプリ)", x: 590, y: 120, color: colors.external, emoji: "🔗", w: 100, h: 45 },
+                { label: "ペイン 2", sublabel: "Tunnel (IDE)", x: 590, y: 180, color: colors.external, emoji: "🔗", w: 100, h: 45 },
+            ];
+            panes.forEach(p => drawNode(g, p, true));
+
+            // サービス
+            const services = [
+                { label: "auto-stop.service", sublabel: "アイドル→自動停止", x: 130, y: 315, color: colors.auto, emoji: "⏱️", w: 140, h: 45 },
+                { label: "code-server.service", sublabel: "ブラウザIDE", x: 290, y: 315, color: colors.app, emoji: "💻", w: 140, h: 45 },
+            ];
+            services.forEach(s => drawNode(g, s, true));
+
+            // IAMロール説明
+            g.append("text")
+                .attr("x", 560)
+                .attr("y", 295)
+                .attr("fill", "#aaa")
+                .attr("text-anchor", "middle")
+                .style("font-size", "12px")
+                .text("🔐 他環境操作権限（自動認証）");
+
+            // 外部サービス
+            drawGroup(g, { label: "🌐 外部サービス", x: 800, y: 55, w: 180, h: 200, fill: "rgba(233, 30, 99, 0.12)", dashed: true });
+
+            const externals = [
+                { label: "GitHub", x: 890, y: 110, color: colors.auto, emoji: "🐙", w: 90, h: 40 },
+                { label: "Cloudflare", x: 890, y: 160, color: colors.external, emoji: "☁️", w: 90, h: 40 },
+                { label: "Staging", x: 890, y: 210, color: colors.service, emoji: "🚀", w: 90, h: 40 },
+            ];
+            externals.forEach(e => drawNode(g, e, false));
+
+            // Beam Pro
+            drawGroup(g, { label: "📱 Beam Pro", x: 800, y: 280, w: 180, h: 80, fill: groupBg.device, dashed: true });
+            g.append("text")
+                .attr("x", 890)
+                .attr("y", 330)
+                .attr("fill", "#aaa")
+                .attr("text-anchor", "middle")
+                .style("font-size", "11px")
+                .text("🌐 Chrome（アプリ確認）");
+        }
+
+        // ========================================
+        // 3. 作業分担図
+        // ========================================
+        function drawWorkDivisionDiagram() {
+            const container = d3.select("#diagram-work-division");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, width, height])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "520px");
+
+            const g = svg.append("g").attr("transform", "translate(30, 20)");
+
+            // 3つのカラム
+            const columns = [
+                { label: "👤 人の作業", x: 0, fill: "rgba(233, 30, 99, 0.12)" },
+                { label: "🤖 Claude Code作業", x: 360, fill: "rgba(0, 188, 212, 0.12)" },
+                { label: "⚙️ 自動", x: 720, fill: "rgba(96, 125, 139, 0.12)" },
+            ];
+
+            columns.forEach(col => {
+                g.append("rect")
+                    .attr("x", col.x)
+                    .attr("y", 0)
+                    .attr("width", 340)
+                    .attr("height", 460)
+                    .attr("rx", 14)
+                    .attr("fill", col.fill)
+                    .attr("stroke", col.fill.replace("0.12", "0.4"))
+                    .attr("stroke-width", 2);
+
+                g.append("text")
+                    .attr("x", col.x + 170)
+                    .attr("y", 35)
+                    .attr("text-anchor", "middle")
+                    .attr("class", "group-label")
+                    .style("font-size", "16px")
+                    .text(col.label);
+            });
+
+            // 人の作業
+            const humanTasks = [
+                "🛒 ハードウェア購入・接続",
+                "🔑 aws login",
+                "🐙 gh auth login",
+                "☁️ cloudflared tunnel login",
+                "🔗 tailscale up",
+                "📱 Beam Pro設定",
+            ];
+
+            humanTasks.forEach((task, i) => {
+                const y = 80 + i * 60;
+                g.append("rect")
+                    .attr("x", 20)
+                    .attr("y", y)
+                    .attr("width", 300)
+                    .attr("height", 45)
+                    .attr("rx", 10)
+                    .attr("fill", colors.external)
+                    .style("filter", "drop-shadow(2px 2px 4px rgba(0,0,0,0.2))");
+
+                g.append("text")
+                    .attr("x", 170)
+                    .attr("y", y + 28)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "13px")
+                    .style("font-weight", "600")
+                    .text(task);
+            });
+
+            // Claude Code作業
+            const claudeTasks = [
+                "☁️ EC2作成・削除",
+                "🔐 IAMロール作成",
+                "🔧 環境構築",
+                "🐙 GitHub操作",
+                "🚀 開発サーバー操作",
+                "🔍 障害調査",
+                "⚡ EC2起動・停止",
+            ];
+
+            claudeTasks.forEach((task, i) => {
+                const y = 65 + i * 55;
+                g.append("rect")
+                    .attr("x", 380)
+                    .attr("y", y)
+                    .attr("width", 300)
+                    .attr("height", 42)
+                    .attr("rx", 10)
+                    .attr("fill", "#00BCD4")
+                    .style("filter", "drop-shadow(2px 2px 4px rgba(0,0,0,0.2))");
+
+                g.append("text")
+                    .attr("x", 530)
+                    .attr("y", y + 26)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "13px")
+                    .style("font-weight", "600")
+                    .text(task);
+            });
+
+            // 自動
+            g.append("rect")
+                .attr("x", 740)
+                .attr("y", 180)
+                .attr("width", 300)
+                .attr("height", 100)
+                .attr("rx", 12)
+                .attr("fill", colors.auto)
+                .style("filter", "drop-shadow(2px 2px 4px rgba(0,0,0,0.2))");
+
+            g.append("text")
+                .attr("x", 890)
+                .attr("y", 220)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#fff")
+                .style("font-size", "14px")
+                .style("font-weight", "600")
+                .text("⏱️ SSH切断後3時間で");
+
+            g.append("text")
+                .attr("x", 890)
+                .attr("y", 250)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#fff")
+                .style("font-size", "14px")
+                .style("font-weight", "600")
+                .text("EC2自動停止");
+        }
+
+        // ========================================
+        // 4. 案件ライフサイクル図
+        // ========================================
+        function drawLifecycleDiagram() {
+            const container = d3.select("#diagram-lifecycle");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [-10, 0, 900, 420])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "420px");
+
+            addArrowMarker(svg, "arrow-lifecycle");
+
+            const g = svg.append("g").attr("transform", "translate(30, 20)");
+
+            // フェーズ背景（ラベルとノードが重ならないよう高さを調整）
+            const phases = [
+                { label: "🚀 セットアップ（初回のみ）", x: 0, y: 0, w: 820, h: 100, fill: groupBg.app },
+                { label: "🔄 日次運用", x: 0, y: 120, w: 720, h: 100, fill: "rgba(76, 175, 80, 0.12)" },
+                { label: "🗑️ 案件終了", x: 0, y: 240, w: 180, h: 90, fill: "rgba(244, 67, 54, 0.12)" },
+            ];
+            phases.forEach(p => drawGroup(g, p));
+
+            // セットアップステップ（グループラベル下に配置: y = groupY + 35 + padding）
+            const setupY = 60;  // グループy=0 + ラベル高さ35 + パディング25
+            const setupSteps = [
+                { label: "📄 Doc渡す", x: 70, y: setupY, color: colors.app, w: 100, h: 40 },
+                { label: "✏️ 案件入力", x: 190, y: setupY, color: colors.app, w: 100, h: 40 },
+                { label: "☁️ EC2作成", x: 310, y: setupY, color: colors.aws, w: 100, h: 40 },
+                { label: "🔧 環境構築", x: 430, y: setupY, color: colors.aws, w: 100, h: 40 },
+                { label: "🔑 認証作業", x: 550, y: setupY, color: colors.external, w: 100, h: 40 },
+                { label: "✅ 動作確認", x: 670, y: setupY, color: colors.service, w: 100, h: 40 },
+            ];
+
+            setupSteps.forEach((step, i) => {
+                drawNode(g, { ...step, emoji: null }, false);
+
+                if (i < setupSteps.length - 1) {
+                    const next = setupSteps[i + 1];
+                    g.append("path")
+                        .attr("class", "link")
+                        .attr("d", straightPath(step.x + 50, step.y, next.x - 50, next.y))
+                        .attr("marker-end", "url(#arrow-lifecycle)");
+                }
+            });
+
+            // 日次運用ステップ（グループy=120 + ラベル高さ35 + パディング25 = 180）
+            const dailyY = 180;
+            const dailySteps = [
+                { label: "⚡ EC2起動", x: 70, y: dailyY, color: colors.aws, w: 100, h: 40 },
+                { label: "📺 tmux接続", x: 200, y: dailyY, color: colors.aws, w: 100, h: 40 },
+                { label: "💻 開発作業", x: 340, y: dailyY, color: colors.service, w: 110, h: 40 },
+                { label: "🚪 SSH切断", x: 480, y: dailyY, color: colors.auto, w: 100, h: 40 },
+                { label: "⏱️ 3h後停止", x: 610, y: dailyY, color: colors.auto, w: 100, h: 40 },
+            ];
+
+            dailySteps.forEach((step, i) => {
+                drawNode(g, { ...step, emoji: null }, false);
+
+                if (i < dailySteps.length - 1) {
+                    const next = dailySteps[i + 1];
+                    g.append("path")
+                        .attr("class", "link")
+                        .attr("d", straightPath(step.x + 50, step.y, next.x - 50, next.y))
+                        .attr("marker-end", "url(#arrow-lifecycle)");
+                }
+            });
+
+            // 日次ループ矢印（グループの外側を通る）
+            // 日次運用グループの下端 = 120 + 100 = 220、その下を通す
+            const loopBottom = 360;  // 案件終了グループ(240+90=330)より下
+            const loopRight = 750;   // 日次運用グループ(720)より右
+            const loopLeft = -30;    // 左側への振り幅（EC2起動の左端より更に左）
+            const firstNodeLeft = 20; // EC2起動ノードの左端
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", `M660,${dailyY} L${loopRight},${dailyY} L${loopRight},${loopBottom} L${loopLeft},${loopBottom} L${loopLeft},${dailyY} L${firstNodeLeft},${dailyY}`)
+                .attr("stroke-dasharray", "6,4")
+                .attr("marker-end", "url(#arrow-lifecycle)");
+
+            // 翌日ラベル（ループの下部に配置）
+            g.append("text")
+                .attr("x", 350)
+                .attr("y", loopBottom + 15)
+                .attr("class", "link-label")
+                .text("🔄 翌日");
+
+            // 案件終了（グループy=240 + ラベル高さ35 + パディング20 = 295）
+            const endY = 295;
+            drawNode(g, { label: "🗑️ リソース削除", x: 90, y: endY, color: colors.external, w: 130, h: 40, emoji: null }, false);
+        }
+
+        // ========================================
+        // 5. 自動停止判定ロジック
+        // ========================================
+        function drawAutoStopDiagram() {
+            const container = d3.select("#diagram-auto-stop");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, 900, 480])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "480px");
+
+            addArrowMarker(svg, "arrow-flow", "#4a5568");
+
+            const g = svg.append("g").attr("transform", "translate(180, 30)");
+
+            // フローチャートノード
+            const flowNodes = [
+                { id: "start", label: "⏱️ 5分ごとにチェック", x: 200, y: 30, type: "rect", color: colors.app },
+                { id: "ssh", label: "SSH接続あり？", x: 200, y: 130, type: "diamond", color: colors.aws },
+                { id: "active", label: "✅ 接続中", sublabel: "タイマーリセット", x: 50, y: 250, type: "rect", color: colors.service },
+                { id: "idle", label: "⏳ 未接続", sublabel: "タイマー継続", x: 350, y: 250, type: "rect", color: colors.auto },
+                { id: "check3h", label: "3時間経過？", x: 350, y: 350, type: "diamond", color: colors.aws },
+                { id: "stop", label: "🛑 EC2停止", x: 350, y: 440, type: "rect", color: colors.external },
+            ];
+
+            // ノード描画
+            flowNodes.forEach(node => {
+                const nodeG = g.append("g")
+                    .attr("transform", `translate(${node.x}, ${node.y})`);
+
+                if (node.type === "diamond") {
+                    nodeG.append("polygon")
+                        .attr("points", "0,-40 70,0 0,40 -70,0")
+                        .attr("fill", node.color)
+                        .style("filter", "drop-shadow(2px 2px 4px rgba(0,0,0,0.3))");
+
+                    nodeG.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#fff")
+                        .attr("y", 5)
+                        .style("font-size", "12px")
+                        .style("font-weight", "600")
+                        .text(node.label);
+                } else {
+                    nodeG.append("rect")
+                        .attr("x", -70)
+                        .attr("y", -25)
+                        .attr("width", 140)
+                        .attr("height", 50)
+                        .attr("rx", 10)
+                        .attr("fill", node.color)
+                        .style("filter", "drop-shadow(2px 2px 4px rgba(0,0,0,0.3))");
+
+                    nodeG.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#fff")
+                        .attr("y", node.sublabel ? -3 : 5)
+                        .style("font-size", "12px")
+                        .style("font-weight", "600")
+                        .text(node.label);
+
+                    if (node.sublabel) {
+                        nodeG.append("text")
+                            .attr("text-anchor", "middle")
+                            .attr("fill", "rgba(255,255,255,0.7)")
+                            .attr("y", 15)
+                            .style("font-size", "10px")
+                            .text(node.sublabel);
+                    }
+                }
+            });
+
+            // 矢印
+            const arrows = [
+                { from: [200, 55], to: [200, 90], label: "" },
+                { from: [130, 130], to: [50, 225], label: "はい" },
+                { from: [270, 130], to: [350, 225], label: "いいえ" },
+                { from: [350, 275], to: [350, 310], label: "" },
+                { from: [350, 390], to: [350, 415], label: "はい" },
+            ];
+
+            arrows.forEach(arr => {
+                g.append("path")
+                    .attr("class", "link")
+                    .attr("d", `M${arr.from[0]},${arr.from[1]} L${arr.to[0]},${arr.to[1]}`)
+                    .attr("marker-end", "url(#arrow-flow)");
+
+                if (arr.label) {
+                    const mx = (arr.from[0] + arr.to[0]) / 2;
+                    const my = (arr.from[1] + arr.to[1]) / 2;
+                    g.append("text")
+                        .attr("x", mx + 15)
+                        .attr("y", my)
+                        .attr("class", "link-label")
+                        .text(arr.label);
+                }
+            });
+
+            // ループ矢印
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", "M-20,250 Q-60,250 -60,140 Q-60,30 130,30")
+                .attr("marker-end", "url(#arrow-flow)");
+
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", "M420,350 Q500,350 500,180 Q500,30 270,30")
+                .attr("marker-end", "url(#arrow-flow)");
+
+            g.append("text")
+                .attr("x", 540)
+                .attr("y", 200)
+                .attr("class", "link-label")
+                .text("いいえ");
+
+            // ポイント説明
+            const points = [
+                "✅ シンプルな判定: SSH接続の有無のみ",
+                "✅ 3時間の猶予: Claude Codeに依頼して離席OK",
+                "✅ 複数案件対応: 案件切り替えも安心",
+            ];
+
+            const infoG = g.append("g").attr("transform", "translate(500, 250)");
+            infoG.append("rect")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("width", 220)
+                .attr("height", 120)
+                .attr("rx", 10)
+                .attr("fill", "rgba(0,0,0,0.3)");
+
+            infoG.append("text")
+                .attr("x", 15)
+                .attr("y", 28)
+                .attr("fill", "#fff")
+                .style("font-weight", "700")
+                .style("font-size", "13px")
+                .text("💡 ポイント");
+
+            points.forEach((point, i) => {
+                infoG.append("text")
+                    .attr("x", 15)
+                    .attr("y", 55 + i * 22)
+                    .attr("fill", "#aaa")
+                    .style("font-size", "10px")
+                    .text(point);
+            });
+        }
+
+        // ========================================
+        // 6. コスト構造（パイチャート）
+        // ========================================
+        function drawCostDiagram() {
+            const container = d3.select("#diagram-cost");
+            container.selectAll("*").remove();
+
+            const pieContainer = container.append("div")
+                .attr("class", "pie-container");
+
+            const datasets = [
+                {
+                    title: "💰 24時間稼働時 月額コスト $11.1（スポット）",
+                    data: [
+                        { label: "EC2 (t4g.small)", value: 5.0, color: colors.aws },
+                        { label: "EBS (30GB gp3)", value: 2.88, color: colors.app },
+                        { label: "その他", value: 3.22, color: colors.auto }
+                    ]
+                },
+                {
+                    title: "💵 自動停止運用時 月額コスト 約$7",
+                    data: [
+                        { label: "EC2 (実稼働分)", value: 4, color: colors.aws },
+                        { label: "EBS (30GB gp3)", value: 2.88, color: colors.app }
+                    ]
+                }
+            ];
+
+            datasets.forEach(dataset => {
+                const chartDiv = pieContainer.append("div")
+                    .attr("class", "pie-chart");
+
+                chartDiv.append("div")
+                    .attr("class", "pie-title")
+                    .text(dataset.title);
+
+                const svg = chartDiv.append("svg")
+                    .attr("width", 320)
+                    .attr("height", 320);
+
+                const chartG = svg.append("g")
+                    .attr("transform", "translate(160, 140)");
+
+                const pie = d3.pie()
+                    .value(d => d.value)
+                    .sort(null);
+
+                const arc = d3.arc()
+                    .innerRadius(45)
+                    .outerRadius(95);
+
+                const labelArc = d3.arc()
+                    .innerRadius(110)
+                    .outerRadius(110);
+
+                const arcs = chartG.selectAll(".arc")
+                    .data(pie(dataset.data))
+                    .join("g")
+                    .attr("class", "arc");
+
+                arcs.append("path")
+                    .attr("d", arc)
+                    .attr("fill", d => d.data.color)
+                    .style("filter", "drop-shadow(2px 2px 4px rgba(0,0,0,0.3))")
+                    .style("stroke", "#1a1a2e")
+                    .style("stroke-width", 2);
+
+                arcs.append("text")
+                    .attr("transform", d => `translate(${labelArc.centroid(d)})`)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "12px")
+                    .style("font-weight", "600")
+                    .text(d => `$${d.data.value}`);
+
+                // 凡例
+                const legend = svg.append("g")
+                    .attr("transform", "translate(20, 260)");
+
+                dataset.data.forEach((item, i) => {
+                    const legendItem = legend.append("g")
+                        .attr("transform", `translate(${i * 100}, 0)`);
+
+                    legendItem.append("rect")
+                        .attr("width", 14)
+                        .attr("height", 14)
+                        .attr("rx", 3)
+                        .attr("fill", item.color);
+
+                    legendItem.append("text")
+                        .attr("x", 18)
+                        .attr("y", 11)
+                        .attr("fill", "#aaa")
+                        .style("font-size", "10px")
+                        .text(item.label.substring(0, 12));
+                });
+            });
+        }
+
+        // ========================================
+        // 7. ファイル構成図
+        // ========================================
+        function drawFileStructureDiagram() {
+            const container = d3.select("#diagram-file-structure");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, width, 420])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "420px");
+
+            addArrowMarker(svg, "arrow-file");
+
+            const g = svg.append("g").attr("transform", "translate(30, 20)");
+
+            // ドキュメントグループ
+            drawGroup(g, { label: "📁 ドキュメント構成", x: 0, y: 0, w: 560, h: 200, fill: groupBg.app, dashed: false });
+
+            const docs = [
+                { label: "01-human-prerequisites", sublabel: "👤 事前作業ガイド", x: 150, y: 70, color: colors.external, w: 200, h: 45 },
+                { label: "02-control-ec2-setup", sublabel: "🤖 コントロールEC2構築", x: 150, y: 130, color: colors.app, w: 200, h: 45 },
+                { label: "03-new-project-setup", sublabel: "🤖 新規案件セットアップ", x: 400, y: 70, color: colors.app, w: 190, h: 45 },
+                { label: "04-operations", sublabel: "🤖 運用タスク集", x: 400, y: 130, color: colors.service, w: 190, h: 45 },
+                { label: "05-scenario-guide", sublabel: "📖 シナリオガイド", x: 400, y: 190, color: colors.service, w: 190, h: 45 },
+            ];
+
+            docs.forEach(doc => drawNode(g, { ...doc, emoji: null }, true));
+
+            // フローチャート
+            const flowY = 300;
+            const flowNodes = [
+                { label: "👤 人", x: 80, y: flowY, color: colors.external, w: 80, h: 45 },
+                { label: "📄 Doc1", x: 190, y: flowY, color: colors.external, w: 80, h: 45 },
+                { label: "📄 Doc2/3", x: 300, y: flowY, color: colors.app, w: 90, h: 45 },
+                { label: "🤖 Claude", x: 420, y: flowY, color: "#00BCD4", w: 90, h: 45 },
+                { label: "✅ 完了", x: 540, y: flowY, color: colors.service, w: 80, h: 45 },
+                { label: "📄 Doc4/5", x: 660, y: flowY, color: colors.service, w: 90, h: 45 },
+            ];
+
+            flowNodes.forEach((node, i) => {
+                drawNode(g, { ...node, emoji: null }, false);
+
+                if (i < flowNodes.length - 1) {
+                    const next = flowNodes[i + 1];
+                    g.append("path")
+                        .attr("class", "link")
+                        .attr("d", straightPath(node.x + node.w / 2, node.y, next.x - next.w / 2, next.y))
+                        .attr("marker-end", "url(#arrow-file)");
+                }
+            });
+
+            // ラベル
+            const labels = ["読んで実行", "完了後渡す", "自動実行", "セットアップ完了", "日常運用"];
+            labels.forEach((label, i) => {
+                g.append("text")
+                    .attr("x", 135 + i * 115)
+                    .attr("y", flowY - 35)
+                    .attr("class", "link-label")
+                    .text(label);
+            });
+        }
+
+        // ========================================
+        // 8. ネットワーク構成図（左→右フロー、グループ境界経由）
+        // ========================================
+        function drawNetworkDiagram() {
+            const container = d3.select("#diagram-network");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, 880, 380])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "380px");
+
+            addArrowMarker(svg, "arrow-network");
+
+            const g = svg.append("g").attr("transform", "translate(20, 20)");
+
+            // グループ境界の定義
+            const AWS_LEFT = 160;
+            const AWS_RIGHT = 560;
+            const AWS_TOP = 20;
+            const AWS_BOTTOM = 320;
+
+            // 領域（左→右の順序で配置）
+            const regions = [
+                { label: "📱 モバイル", x: 0, y: 70, w: 140, h: 100, fill: groupBg.device },
+                { label: "☁️ AWS", x: AWS_LEFT, y: AWS_TOP, w: 400, h: 300, fill: groupBg.aws },
+                { label: "🌐 インターネット", x: 590, y: 70, w: 140, h: 100, fill: "rgba(233, 30, 99, 0.12)" },
+            ];
+            regions.forEach(r => drawGroup(g, r));
+
+            // VPC (AWS内)
+            const VPC_LEFT = 180;
+            const VPC_RIGHT = 420;
+            const VPC_TOP = 60;
+            const VPC_BOTTOM = 200;
+            g.append("rect")
+                .attr("x", VPC_LEFT)
+                .attr("y", VPC_TOP)
+                .attr("width", VPC_RIGHT - VPC_LEFT)
+                .attr("height", VPC_BOTTOM - VPC_TOP)
+                .attr("rx", 10)
+                .attr("fill", "rgba(76, 175, 80, 0.1)")
+                .attr("stroke", "rgba(76, 175, 80, 0.4)")
+                .attr("stroke-dasharray", "6,4");
+
+            g.append("text")
+                .attr("x", VPC_LEFT + 15)
+                .attr("y", VPC_TOP + 22)
+                .attr("fill", "#888")
+                .style("font-size", "10px")
+                .text("VPC / Security Group");
+
+            // ノード定義（Y座標を揃えて水平線にする）
+            const MAIN_Y = 130;  // メインフローのY座標を統一
+            const netNodes = [
+                // Layer 0: モバイル
+                { id: "beampro", label: "Beam Pro", x: 70, y: MAIN_Y, color: colors.app, emoji: "📱", w: 100, h: 45 },
+
+                // Layer 1: AWS/VPC内
+                { id: "ec2", label: "EC2", sublabel: "Elastic IP", x: 250, y: MAIN_Y, color: colors.aws, emoji: "🖥️", w: 100, h: 50 },
+                { id: "tunnel", label: "cloudflared", sublabel: "Tunnel", x: 370, y: MAIN_Y, color: colors.aws, emoji: "🔗", w: 90, h: 50 },
+
+                // AWS内（VPC外）
+                { id: "cw", label: "CloudWatch", x: 260, y: 265, color: colors.app, emoji: "📊", w: 110, h: 45 },
+                { id: "s3", label: "S3 (ログ)", x: 390, y: 265, color: colors.app, emoji: "🗂️", w: 90, h: 45 },
+
+                // Layer 2: インターネット（cloudflaredと同じY座標）
+                { id: "cf", label: "Cloudflare", x: 660, y: MAIN_Y, color: colors.external, emoji: "☁️", w: 100, h: 45 },
+            ];
+
+            const nodeMap = {};
+            netNodes.forEach(n => nodeMap[n.id] = n);
+
+            // === エッジ描画 ===
+            const BOUNDARY_OFFSET = 15;
+
+            // 1. Beam Pro → EC2（Y座標が同じなので直線）
+            const beampro = nodeMap["beampro"];
+            const ec2 = nodeMap["ec2"];
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", straightPath(beampro.x + beampro.w/2, beampro.y, ec2.x - ec2.w/2, ec2.y))
+                .attr("marker-end", "url(#arrow-network)");
+            g.append("text")
+                .attr("x", (beampro.x + beampro.w/2 + ec2.x - ec2.w/2) / 2)
+                .attr("y", beampro.y - 10)
+                .attr("class", "link-label")
+                .text("SSH:22");
+
+            // 2. EC2 → cloudflared（VPC内、直線）
+            const tunnel = nodeMap["tunnel"];
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", straightPath(ec2.x + ec2.w/2, ec2.y, tunnel.x - tunnel.w/2, tunnel.y))
+                .attr("marker-end", "url(#arrow-network)");
+
+            // 3. cloudflared → Cloudflare（Y座標が同じなので直線）
+            const cf = nodeMap["cf"];
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", straightPath(tunnel.x + tunnel.w/2, tunnel.y, cf.x - cf.w/2, cf.y))
+                .attr("marker-end", "url(#arrow-network)");
+
+            // 4. EC2 → CloudWatch（下方向）
+            const cw = nodeMap["cw"];
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", straightPath(ec2.x, ec2.y + ec2.h/2, cw.x, cw.y - cw.h/2))
+                .attr("marker-end", "url(#arrow-network)");
+            g.append("text")
+                .attr("x", ec2.x - 25)
+                .attr("y", (ec2.y + ec2.h/2 + cw.y - cw.h/2) / 2)
+                .attr("class", "link-label")
+                .text("IAM");
+
+            // 5. EC2 → S3（斜め下）
+            const s3 = nodeMap["s3"];
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", curvedPath(ec2.x + ec2.w/2, ec2.y + ec2.h/2, s3.x, s3.y - s3.h/2, 0.05))
+                .attr("marker-end", "url(#arrow-network)");
+
+            // ノード描画
+            netNodes.forEach(n => drawNode(g, n, true));
+        }
+
+        // ========================================
+        // 9. AWS権限構成図
+        // ========================================
+        function drawAWSPermissionDiagram() {
+            const container = d3.select("#diagram-aws-permission");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, 900, 480])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "480px");
+
+            addArrowMarker(svg, "arrow-perm");
+
+            const g = svg.append("g").attr("transform", "translate(100, 40)");
+
+            // 3段階のレベル
+            const levels = [
+                { label: "レベル1: ルートユーザー", sublabel: "🔐 全権限（初回のみ使用→封印）", y: 50, color: colors.external, bg: "rgba(244, 67, 54, 0.12)" },
+                { label: "レベル2: 管理者IAMユーザー", sublabel: "👤 AdministratorAccess", y: 170, color: colors.service, bg: "rgba(76, 175, 80, 0.12)" },
+                { label: "レベル3: EC2用IAMロール", sublabel: "🎫 必要最小限の権限（自動認証）", y: 290, color: colors.app, bg: groupBg.app },
+            ];
+
+            levels.forEach((level, i) => {
+                // 背景
+                g.append("rect")
+                    .attr("x", 0)
+                    .attr("y", level.y - 35)
+                    .attr("width", 400)
+                    .attr("height", 70)
+                    .attr("rx", 14)
+                    .attr("fill", level.bg)
+                    .attr("stroke", level.color)
+                    .attr("stroke-width", 2);
+
+                // ラベル
+                g.append("text")
+                    .attr("x", 200)
+                    .attr("y", level.y - 5)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "15px")
+                    .style("font-weight", "700")
+                    .text(level.label);
+
+                g.append("text")
+                    .attr("x", 200)
+                    .attr("y", level.y + 18)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#aaa")
+                    .style("font-size", "12px")
+                    .text(level.sublabel);
+
+                // 矢印
+                if (i < levels.length - 1) {
+                    const next = levels[i + 1];
+                    g.append("path")
+                        .attr("class", "link")
+                        .attr("d", `M200,${level.y + 35} L200,${next.y - 35}`)
+                        .attr("marker-end", "url(#arrow-perm)");
+
+                    const labelText = i === 0
+                        ? "初回のみ作成 → ルートは封印"
+                        : "案件ごとに作成 (aws login)";
+
+                    g.append("text")
+                        .attr("x", 420)
+                        .attr("y", (level.y + next.y) / 2)
+                        .attr("fill", "#888")
+                        .style("font-size", "11px")
+                        .text(labelText);
+                }
+            });
+
+            // EC2へのアタッチ
+            g.append("rect")
+                .attr("x", 500)
+                .attr("y", 255)
+                .attr("width", 150)
+                .attr("height", 70)
+                .attr("rx", 12)
+                .attr("fill", colors.aws)
+                .style("filter", "drop-shadow(3px 3px 6px rgba(0,0,0,0.3))");
+
+            g.append("text")
+                .attr("x", 575)
+                .attr("y", 295)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#fff")
+                .style("font-size", "13px")
+                .style("font-weight", "600")
+                .text("🖥️ EC2インスタンス");
+
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", "M400,290 L500,290")
+                .attr("marker-end", "url(#arrow-perm)");
+
+            g.append("text")
+                .attr("x", 450)
+                .attr("y", 280)
+                .attr("class", "link-label")
+                .text("アタッチ");
+
+            // 表
+            const tableData = [
+                ["レベル", "ユーザー", "用途", "認証"],
+                ["1", "ルートユーザー", "初期設定のみ", "MFA必須、封印"],
+                ["2", "管理者IAM", "EC2/IAM作成", "aws login"],
+                ["3", "EC2用ロール", "EC2内AWS操作", "自動（不要）"],
+            ];
+
+            const tableG = g.append("g").attr("transform", "translate(0, 380)");
+
+            tableData.forEach((row, i) => {
+                const y = i * 26;
+                const fill = i === 0 ? "rgba(255,255,255,0.1)" : "transparent";
+
+                tableG.append("rect")
+                    .attr("x", 0)
+                    .attr("y", y)
+                    .attr("width", 650)
+                    .attr("height", 24)
+                    .attr("fill", fill);
+
+                row.forEach((cell, j) => {
+                    const x = [30, 130, 300, 500][j];
+                    tableG.append("text")
+                        .attr("x", x)
+                        .attr("y", y + 17)
+                        .attr("fill", i === 0 ? "#fff" : "#aaa")
+                        .style("font-size", "12px")
+                        .style("font-weight", i === 0 ? "700" : "400")
+                        .text(cell);
+                });
+            });
+        }
+
+        // ========================================
+        // 10. コントロールEC2からの案件管理（左→右フロー徹底）
+        // ========================================
+        function drawControlMgmtDiagram() {
+            const container = d3.select("#diagram-control-mgmt");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, 1000, 480])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "480px");
+
+            addArrowMarker(svg, "arrow-ctrl");
+
+            const g = svg.append("g").attr("transform", "translate(20, 20)");
+
+            // Beam Pro
+            drawGroup(g, { label: "📱 Beam Pro", x: 0, y: 80, w: 130, h: 100, fill: groupBg.device, dashed: true });
+            drawNode(g, { label: "Termius", x: 65, y: 140, color: colors.app, emoji: "💻", w: 100, h: 45 });
+
+            // AWS
+            drawGroup(g, { label: "☁️ AWS", x: 150, y: 10, w: 680, h: 340, fill: groupBg.aws, dashed: false });
+
+            // Control EC2グループ（内部にtmuxと管理スクリプトを縦に配置）
+            g.append("rect")
+                .attr("x", 170)
+                .attr("y", 50)
+                .attr("width", 200)
+                .attr("height", 160)
+                .attr("rx", 12)
+                .attr("fill", "rgba(33, 150, 243, 0.15)")
+                .attr("stroke", "rgba(33, 150, 243, 0.5)")
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", "6,4");
+
+            g.append("text")
+                .attr("x", 185)
+                .attr("y", 75)
+                .attr("class", "group-label")
+                .style("font-size", "11px")
+                .text("🎮 ar-dev-control（常時起動）");
+
+            // Control EC2内部ツール（縦に並列、同じX座標）
+            const ctrlX = 270;
+            drawNode(g, { label: "tmux [ctrl]", sublabel: "セッション管理", x: ctrlX, y: 115, color: colors.app, emoji: "📺", w: 120, h: 45 });
+            drawNode(g, { label: "管理スクリプト", sublabel: "AWS CLI", x: ctrlX, y: 175, color: colors.service, emoji: "⚙️", w: 120, h: 45 });
+
+            // 案件EC2（縦に並列）
+            const projX = 550;
+            const projects = [
+                { label: "🟢 案件A EC2", x: projX, y: 90, color: colors.aws, emoji: "🖥️", w: 130, h: 50 },
+                { label: "🟡 案件B EC2", x: projX, y: 165, color: colors.aws, emoji: "🖥️", w: 130, h: 50 },
+                { label: "⚫ 案件C EC2", sublabel: "停止中", x: projX, y: 240, color: colors.auto, emoji: "🖥️", w: 130, h: 50 },
+            ];
+            projects.forEach(p => drawNode(g, p, true));
+
+            // 接続線: Termius → Control EC2（左→右）
+            // Termius: x=65, w=100 → 右辺=115
+            // Control EC2グループ: x=170 → 左辺=170
+            g.append("path")
+                .attr("class", "link")
+                .attr("d", straightPath(115, 140, 170, 140))
+                .attr("marker-end", "url(#arrow-ctrl)");
+
+            g.append("text")
+                .attr("x", 142)
+                .attr("y", 130)
+                .attr("class", "link-label")
+                .text("SSH");
+
+            // tmux → 案件EC2（左→右）
+            const tmuxY = 115;
+            [90, 165, 240].forEach((projY, i) => {
+                const curve = (projY - tmuxY) * 0.001;  // Y差に応じた曲率
+                g.append("path")
+                    .attr("class", "link")
+                    .attr("d", curvedPath(330, tmuxY, projX - 65, projY, curve))
+                    .attr("marker-end", "url(#arrow-ctrl)");
+            });
+
+            g.append("text")
+                .attr("x", 400)
+                .attr("y", 80)
+                .attr("class", "link-label")
+                .text("Alt+] で切替");
+
+            // 管理スクリプト → 案件EC2（左→右）
+            const scriptY = 175;
+            [90, 165, 240].forEach((projY, i) => {
+                const curve = (projY - scriptY) * 0.0008;
+                g.append("path")
+                    .attr("class", "link")
+                    .attr("d", curvedPath(330, scriptY, projX - 65, projY, curve))
+                    .attr("stroke-dasharray", "4,3")
+                    .attr("marker-end", "url(#arrow-ctrl)");
+            });
+
+            g.append("text")
+                .attr("x", 400)
+                .attr("y", 220)
+                .attr("class", "link-label")
+                .text("起動/停止");
+
+            // 情報ボックス（図の下部に配置）
+            const infoG = g.append("g").attr("transform", "translate(150, 360)");
+
+            // 管理コマンド
+            infoG.append("rect")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("width", 280)
+                .attr("height", 140)
+                .attr("rx", 10)
+                .attr("fill", "rgba(0,0,0,0.3)");
+
+            infoG.append("text")
+                .attr("x", 15)
+                .attr("y", 28)
+                .attr("fill", "#fff")
+                .style("font-weight", "700")
+                .style("font-size", "13px")
+                .text("⚙️ 管理コマンド");
+
+            const commands = [
+                "list-projects     : 案件一覧",
+                "start-project XX  : 案件XX起動",
+                "stop-project XX   : 案件XX停止",
+                "start-all         : 全案件起動",
+                "stop-all          : 全案件停止",
+            ];
+
+            commands.forEach((cmd, i) => {
+                infoG.append("text")
+                    .attr("x", 15)
+                    .attr("y", 55 + i * 18)
+                    .attr("fill", "#aaa")
+                    .style("font-family", "monospace")
+                    .style("font-size", "11px")
+                    .text(cmd);
+            });
+
+            // キーバインド
+            infoG.append("rect")
+                .attr("x", 300)
+                .attr("y", 0)
+                .attr("width", 280)
+                .attr("height", 140)
+                .attr("rx", 10)
+                .attr("fill", "rgba(0,0,0,0.3)");
+
+            infoG.append("text")
+                .attr("x", 315)
+                .attr("y", 28)
+                .attr("fill", "#fff")
+                .style("font-weight", "700")
+                .style("font-size", "13px")
+                .text("⌨️ tmux キーバインド");
+
+            const keybinds = [
+                "Alt + ]  → 次のwindow",
+                "Alt + [  → 前のwindow",
+                "",
+                "✅ キーボードだけで全操作完結",
+                "✅ Beam Pro に触る必要なし",
+                "✅ 複数案件の瞬時切り替え",
+            ];
+
+            keybinds.forEach((kb, i) => {
+                infoG.append("text")
+                    .attr("x", 315)
+                    .attr("y", 55 + i * 16)
+                    .attr("fill", "#aaa")
+                    .style("font-size", "11px")
+                    .text(kb);
+            });
+        }
+
+        // ========================================
+        // 初期描画
+        // ========================================
+        drawOverallDiagram();
+
+        // タブ切り替え時に描画
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                switch(tabId) {
+                    case 'overall': drawOverallDiagram(); break;
+                    case 'ec2-internal': drawEC2InternalDiagram(); break;
+                    case 'work-division': drawWorkDivisionDiagram(); break;
+                    case 'lifecycle': drawLifecycleDiagram(); break;
+                    case 'auto-stop': drawAutoStopDiagram(); break;
+                    case 'cost': drawCostDiagram(); break;
+                    case 'file-structure': drawFileStructureDiagram(); break;
+                    case 'network': drawNetworkDiagram(); break;
+                    case 'aws-permission': drawAWSPermissionDiagram(); break;
+                    case 'control-mgmt': drawControlMgmtDiagram(); break;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
