@@ -222,21 +222,27 @@
 
         <nav class="tab-nav">
             <button class="tab-btn active" data-tab="overall">1. 全体構成</button>
-            <button class="tab-btn" data-tab="ec2-internal">2. EC2内部構成</button>
-            <button class="tab-btn" data-tab="work-division">3. 作業分担</button>
-            <button class="tab-btn" data-tab="lifecycle">4. ライフサイクル</button>
-            <button class="tab-btn" data-tab="auto-stop">5. 自動停止</button>
-            <button class="tab-btn" data-tab="cost">6. コスト</button>
-            <button class="tab-btn" data-tab="file-structure">7. ファイル構成</button>
-            <button class="tab-btn" data-tab="network">8. ネットワーク</button>
-            <button class="tab-btn" data-tab="aws-permission">9. AWS権限</button>
-            <button class="tab-btn" data-tab="control-mgmt">10. 案件管理</button>
+            <button class="tab-btn" data-tab="usage-scene">2. 利用シーン</button>
+            <button class="tab-btn" data-tab="ec2-internal">3. EC2内部構成</button>
+            <button class="tab-btn" data-tab="work-division">4. 作業分担</button>
+            <button class="tab-btn" data-tab="lifecycle">5. ライフサイクル</button>
+            <button class="tab-btn" data-tab="auto-stop">6. 自動停止</button>
+            <button class="tab-btn" data-tab="cost">7. コスト</button>
+            <button class="tab-btn" data-tab="file-structure">8. ファイル構成</button>
+            <button class="tab-btn" data-tab="network">9. ネットワーク</button>
+            <button class="tab-btn" data-tab="aws-permission">10. AWS権限</button>
+            <button class="tab-btn" data-tab="control-mgmt">11. 案件管理</button>
         </nav>
 
         <div class="diagram-container">
             <div id="overall" class="tab-content active">
                 <h2 class="diagram-title">🏗️ 全体構成</h2>
                 <div id="diagram-overall"></div>
+            </div>
+
+            <div id="usage-scene" class="tab-content">
+                <h2 class="diagram-title">📍 利用シーン別構成</h2>
+                <div id="diagram-usage-scene"></div>
             </div>
 
             <div id="ec2-internal" class="tab-content">
@@ -636,7 +642,307 @@
         }
 
         // ========================================
-        // 2. EC2内部構成図
+        // 2. 利用シーン別構成図
+        // ========================================
+        function drawUsageSceneDiagram() {
+            const container = d3.select("#diagram-usage-scene");
+            container.selectAll("*").remove();
+
+            const svg = container.append("svg")
+                .attr("viewBox", [0, 0, 1000, 580])
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .style("height", "580px");
+
+            const g = svg.append("g").attr("transform", "translate(20, 20)");
+
+            // シーンデータ
+            const scenes = [
+                {
+                    id: "home",
+                    emoji: "🏠",
+                    title: "自宅・外出先",
+                    subtitle: "長時間作業",
+                    color: colors.service,
+                    bg: "rgba(76, 175, 80, 0.15)",
+                    devices: ["🕶️ XREAL", "📱 Beam Pro", "⌨️ キーボード"],
+                    power: "🔌 給電",
+                    input: "⌨️ キーボード",
+                    duration: "★★★",
+                    work: "本格開発"
+                },
+                {
+                    id: "cafe",
+                    emoji: "☕",
+                    title: "カフェ",
+                    subtitle: "中時間作業",
+                    color: colors.app,
+                    bg: "rgba(33, 150, 243, 0.15)",
+                    devices: ["🕶️ XREAL", "📱 Beam Pro", "⌨️ キーボード"],
+                    power: "🔋 バッテリー",
+                    input: "⌨️ キーボード",
+                    duration: "★★☆",
+                    work: "本格開発"
+                },
+                {
+                    id: "park",
+                    emoji: "🌳",
+                    title: "公園・散歩",
+                    subtitle: "ハンズフリー",
+                    color: colors.external,
+                    bg: "rgba(233, 30, 99, 0.15)",
+                    devices: ["🕶️ XREAL", "📱 Beam Pro", "🎧 LinkBuds"],
+                    power: "🔋 バッテリー",
+                    input: "🎤 音声指示",
+                    duration: "★☆☆",
+                    work: "設計・レビュー"
+                },
+                {
+                    id: "train",
+                    emoji: "🚃",
+                    title: "電車（座席）",
+                    subtitle: "省スペース",
+                    color: colors.aws,
+                    bg: "rgba(255, 152, 0, 0.15)",
+                    devices: ["🕶️ XREAL", "📱 Beam Pro"],
+                    power: "🔋 バッテリー",
+                    input: "⌨️ Gboard QWERTY",
+                    duration: "★☆☆",
+                    work: "中程度の作業"
+                }
+            ];
+
+            const cardWidth = 220;
+            const cardHeight = 280;
+            const cardGap = 25;
+            const startX = (1000 - (cardWidth * 4 + cardGap * 3)) / 2;
+
+            // 4つのシーンカードを描画
+            scenes.forEach((scene, i) => {
+                const x = startX + i * (cardWidth + cardGap);
+                const y = 10;
+
+                const cardG = g.append("g")
+                    .attr("class", "scene-card")
+                    .attr("transform", `translate(${x}, ${y})`)
+                    .style("cursor", "pointer");
+
+                // カード背景
+                cardG.append("rect")
+                    .attr("width", cardWidth)
+                    .attr("height", cardHeight)
+                    .attr("rx", 16)
+                    .attr("fill", scene.bg)
+                    .attr("stroke", scene.color)
+                    .attr("stroke-width", 2)
+                    .style("filter", "drop-shadow(3px 3px 8px rgba(0,0,0,0.3))")
+                    .style("transition", "all 0.3s ease");
+
+                // アイコン
+                cardG.append("text")
+                    .attr("x", cardWidth / 2)
+                    .attr("y", 45)
+                    .attr("text-anchor", "middle")
+                    .style("font-size", "36px")
+                    .text(scene.emoji);
+
+                // タイトル
+                cardG.append("text")
+                    .attr("x", cardWidth / 2)
+                    .attr("y", 80)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "16px")
+                    .style("font-weight", "700")
+                    .text(scene.title);
+
+                // サブタイトル
+                cardG.append("text")
+                    .attr("x", cardWidth / 2)
+                    .attr("y", 100)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#aaa")
+                    .style("font-size", "12px")
+                    .text(scene.subtitle);
+
+                // 区切り線
+                cardG.append("line")
+                    .attr("x1", 15)
+                    .attr("y1", 115)
+                    .attr("x2", cardWidth - 15)
+                    .attr("y2", 115)
+                    .attr("stroke", "rgba(255,255,255,0.2)")
+                    .attr("stroke-width", 1);
+
+                // デバイス構成（簡易フロー）
+                const deviceY = 140;
+                scene.devices.forEach((device, di) => {
+                    cardG.append("text")
+                        .attr("x", cardWidth / 2)
+                        .attr("y", deviceY + di * 22)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#ccc")
+                        .style("font-size", "13px")
+                        .text(device);
+
+                    // 接続線（最後以外）
+                    if (di < scene.devices.length - 1) {
+                        cardG.append("text")
+                            .attr("x", cardWidth / 2)
+                            .attr("y", deviceY + di * 22 + 14)
+                            .attr("text-anchor", "middle")
+                            .attr("fill", "#666")
+                            .style("font-size", "10px")
+                            .text("│");
+                    }
+                });
+
+                // 電源
+                const powerY = deviceY + scene.devices.length * 22 + 10;
+                cardG.append("rect")
+                    .attr("x", 15)
+                    .attr("y", powerY)
+                    .attr("width", cardWidth - 30)
+                    .attr("height", 24)
+                    .attr("rx", 6)
+                    .attr("fill", scene.power.includes("給電") ? "rgba(76, 175, 80, 0.3)" : "rgba(255, 193, 7, 0.3)");
+
+                cardG.append("text")
+                    .attr("x", cardWidth / 2)
+                    .attr("y", powerY + 16)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "12px")
+                    .text(scene.power);
+
+                // 入力方法
+                const inputY = powerY + 35;
+                cardG.append("rect")
+                    .attr("x", 15)
+                    .attr("y", inputY)
+                    .attr("width", cardWidth - 30)
+                    .attr("height", 24)
+                    .attr("rx", 6)
+                    .attr("fill", scene.color)
+                    .attr("opacity", 0.6);
+
+                cardG.append("text")
+                    .attr("x", cardWidth / 2)
+                    .attr("y", inputY + 16)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "12px")
+                    .style("font-weight", "600")
+                    .text(scene.input);
+
+                // ホバーエフェクト
+                cardG.on("mouseenter", function() {
+                    d3.select(this).select("rect")
+                        .attr("stroke-width", 4)
+                        .style("filter", "drop-shadow(5px 5px 15px rgba(0,0,0,0.5))");
+                })
+                .on("mouseleave", function() {
+                    d3.select(this).select("rect")
+                        .attr("stroke-width", 2)
+                        .style("filter", "drop-shadow(3px 3px 8px rgba(0,0,0,0.3))");
+                });
+            });
+
+            // 比較表
+            const tableY = 320;
+            const tableX = 50;
+            const colWidths = [160, 180, 150, 180, 120, 150];
+            const headers = ["シーン", "入力方法", "電源", "作業内容", "時間", "通信"];
+            const rowHeight = 36;
+
+            // テーブルヘッダー背景
+            g.append("rect")
+                .attr("x", tableX)
+                .attr("y", tableY)
+                .attr("width", colWidths.reduce((a, b) => a + b, 0))
+                .attr("height", rowHeight)
+                .attr("fill", "rgba(255,255,255,0.1)")
+                .attr("rx", 8);
+
+            // ヘッダーテキスト
+            let headerX = tableX;
+            headers.forEach((header, i) => {
+                g.append("text")
+                    .attr("x", headerX + colWidths[i] / 2)
+                    .attr("y", tableY + 24)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fff")
+                    .style("font-size", "13px")
+                    .style("font-weight", "700")
+                    .text(header);
+                headerX += colWidths[i];
+            });
+
+            // テーブル行データ
+            const tableData = [
+                { scene: "🏠 自宅・外出先", input: "⌨️ 外付キーボード", power: "🔌 給電", work: "本格開発", time: "★★★ 長時間", network: "WiFi / 有線" },
+                { scene: "☕ カフェ", input: "⌨️ 外付キーボード", power: "🔋 バッテリー", work: "本格開発", time: "★★☆ 中時間", network: "WiFi" },
+                { scene: "🌳 公園・散歩", input: "🎤 音声 (LinkBuds)", power: "🔋 バッテリー", work: "設計・レビュー", time: "★☆☆ 短時間", network: "テザリング" },
+                { scene: "🚃 電車（座席）", input: "⌨️ Gboard QWERTY", power: "🔋 バッテリー", work: "中程度の作業", time: "★☆☆ 短時間", network: "モバイル回線" }
+            ];
+
+            tableData.forEach((row, ri) => {
+                const rowY = tableY + rowHeight + ri * rowHeight;
+                const rowColor = scenes[ri].color;
+
+                // 行背景（交互）
+                if (ri % 2 === 0) {
+                    g.append("rect")
+                        .attr("x", tableX)
+                        .attr("y", rowY)
+                        .attr("width", colWidths.reduce((a, b) => a + b, 0))
+                        .attr("height", rowHeight)
+                        .attr("fill", "rgba(255,255,255,0.03)");
+                }
+
+                // 左端にカラーインジケーター
+                g.append("rect")
+                    .attr("x", tableX)
+                    .attr("y", rowY + 4)
+                    .attr("width", 4)
+                    .attr("height", rowHeight - 8)
+                    .attr("fill", rowColor)
+                    .attr("rx", 2);
+
+                // セルデータ
+                const cells = [row.scene, row.input, row.power, row.work, row.time, row.network];
+                let cellX = tableX;
+                cells.forEach((cell, ci) => {
+                    g.append("text")
+                        .attr("x", cellX + colWidths[ci] / 2)
+                        .attr("y", rowY + 24)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", ci === 0 ? "#fff" : "#aaa")
+                        .style("font-size", "12px")
+                        .style("font-weight", ci === 0 ? "600" : "400")
+                        .text(cell);
+                    cellX += colWidths[ci];
+                });
+            });
+
+            // 注釈
+            g.append("text")
+                .attr("x", tableX)
+                .attr("y", tableY + rowHeight * 5 + 25)
+                .attr("fill", "#666")
+                .style("font-size", "11px")
+                .text("💡 Beam Proは2つのUSB-Cポートを搭載 → XREALグラス接続と充電を同時に可能");
+
+            g.append("text")
+                .attr("x", tableX)
+                .attr("y", tableY + rowHeight * 5 + 45)
+                .attr("fill", "#666")
+                .style("font-size", "11px")
+                .text("💡 電車シーンではARグラスの下からBeam Pro画面を見てGboard入力");
+        }
+
+        // ========================================
+        // 3. EC2内部構成図
         // ========================================
         function drawEC2InternalDiagram() {
             const container = d3.select("#diagram-ec2-internal");
@@ -1747,6 +2053,7 @@
                 const tabId = btn.dataset.tab;
                 switch(tabId) {
                     case 'overall': drawOverallDiagram(); break;
+                    case 'usage-scene': drawUsageSceneDiagram(); break;
                     case 'ec2-internal': drawEC2InternalDiagram(); break;
                     case 'work-division': drawWorkDivisionDiagram(); break;
                     case 'lifecycle': drawLifecycleDiagram(); break;

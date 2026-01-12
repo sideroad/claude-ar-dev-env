@@ -55,7 +55,179 @@ flowchart TB
 
 ---
 
-## 2. EC2内部構成
+## 2. 利用シーン別構成
+
+場所や状況に応じて、使用するデバイスと入力方法が異なります。
+
+### 一覧
+
+| シーン | AR表示 | 本体 | 入力 | 電源 | 想定時間 |
+|--------|--------|------|------|------|----------|
+| 🏠 自宅・外出先 | XREAL One Pro | Beam Pro | キーボード | 給電 | 長時間 |
+| ☕ カフェ | XREAL One Pro | Beam Pro | キーボード | バッテリー | 2-3時間 |
+| 🌳 公園・散歩 | XREAL One Pro | Beam Pro | 音声(LinkBuds) | バッテリー | 1時間 |
+| 🚃 電車（座席時） | XREAL One Pro | Beam Pro | Gboard QWERTY | バッテリー | 30分 |
+
+### 🏠 自宅・外出先（長時間作業）
+
+```mermaid
+flowchart LR
+    subgraph Devices["デバイス構成"]
+        XREAL["🕶️ XREAL One Pro"]
+        Beam["📱 Beam Pro<br/>（USB-C×2ポート）"]
+        KB["⌨️ ProtoArc XK01 TP"]
+        Power["🔌 給電（コンセント）"]
+    end
+
+    subgraph Input["入力方法"]
+        Type["⌨️ キーボード入力"]
+    end
+
+    XREAL <-->|USB-C<br/>ポート1| Beam
+    KB -->|Bluetooth| Beam
+    Power -->|USB-C<br/>ポート2| Beam
+    KB --> Type
+```
+
+**特徴**
+- Beam Proは2つのUSB-Cポートを搭載（グラス用 + 電源用）
+- グラス接続と充電を同時に行えるため時間制限なし
+- フルキーボード入力で本格的な開発
+- トラックパッドでマウス操作も可能
+
+> 💡 Beam ProはXREALグラスを接続しながら充電可能（パススルー充電アダプタ不要）
+
+---
+
+### ☕ カフェ（中時間作業）
+
+```mermaid
+flowchart LR
+    subgraph Devices["デバイス構成"]
+        XREAL["🕶️ XREAL One Pro"]
+        Beam["📱 Beam Pro"]
+        KB["⌨️ ProtoArc XK01 TP"]
+        Battery["🔋 バッテリー"]
+    end
+
+    subgraph Input["入力方法"]
+        Type["⌨️ キーボード入力"]
+    end
+
+    XREAL <-->|USB-C| Beam
+    KB -->|Bluetooth| Beam
+    Battery -->|USB-C| Beam
+    KB --> Type
+```
+
+**特徴**
+- バッテリー駆動（2-3時間目安）
+- コンパクトな荷物で移動
+- WiFi環境推奨
+
+---
+
+### 🌳 公園・散歩（ハンズフリー作業）
+
+```mermaid
+flowchart LR
+    subgraph Devices["デバイス構成"]
+        XREAL["🕶️ XREAL One Pro"]
+        Beam["📱 Beam Pro<br/>ポケット収納"]
+        LinkBuds["🎧 LinkBuds"]
+        Battery["🔋 バッテリー"]
+    end
+
+    subgraph Input["入力方法"]
+        Voice["🎤 音声指示"]
+    end
+
+    XREAL <-->|USB-C| Beam
+    LinkBuds -->|Bluetooth| Beam
+    Battery -->|USB-C| Beam
+    LinkBuds --> Voice
+```
+
+**特徴**
+- 完全ハンズフリー
+- Claude Codeへの音声指示でコード生成・レビュー
+- 歩きながらアイデア整理・設計検討
+- キーボード不要で荷物最小
+
+**音声指示の例**
+```
+「この関数にエラーハンドリングを追加して」
+「テストコードを書いて」
+「このコードの問題点を教えて」
+```
+
+---
+
+### 🚃 電車（座席確保時・短時間作業）
+
+```mermaid
+flowchart LR
+    subgraph Devices["デバイス構成"]
+        XREAL["🕶️ XREAL One Pro"]
+        Beam["📱 Beam Pro"]
+        Battery["🔋 バッテリー"]
+    end
+
+    subgraph Input["入力方法"]
+        Touch["⌨️ Gboard QWERTY<br/>（横向き両手入力）"]
+    end
+
+    XREAL <-->|USB-C| Beam
+    Battery -->|USB-C| Beam
+    Beam --> Touch
+```
+
+**特徴**
+- 最小構成（ARグラス + Beam Pro + バッテリーのみ）
+- 横向き + QWERTY配列で両手入力
+- ARグラスの下からBeam Pro画面を見て入力
+- キーボード不要で荷物削減
+
+**向いている作業**
+- Claude Codeへの短〜中程度の指示
+- コードレビューの確認・コメント
+- PRのマージ・作成
+- Slackの確認・返信
+- 軽微なコード修正
+
+---
+
+### シーン別比較
+
+| シーン | 作業時間 | 作業内容 | 入力方法 | 通信 |
+|--------|----------|----------|----------|------|
+| 🏠 自宅・外出先 | ★★★ 長時間 | 本格開発 | 外付キーボード | WiFi/有線 |
+| ☕ カフェ | ★★☆ 中時間 | 本格開発 | 外付キーボード | WiFi |
+| 🌳 公園・散歩 | ★☆☆ 短時間 | 設計・レビュー | 音声 (LinkBuds) | テザリング |
+| 🚃 電車（座席） | ★☆☆ 短時間 | 中程度の作業 | Gboard QWERTY | モバイル回線 |
+
+```mermaid
+flowchart LR
+    subgraph 作業強度
+        Heavy["🏠☕ 本格開発"]
+        Medium["🚃 中程度"]
+        Light["🌳 軽作業"]
+    end
+
+    subgraph 入力方法
+        KB["⌨️ 外付キーボード<br/>🏠☕"]
+        Gboard["⌨️ Gboard QWERTY<br/>🚃"]
+        Voice["🎤 音声<br/>🌳"]
+    end
+
+    Heavy --> KB
+    Medium --> Gboard
+    Light --> Voice
+```
+
+---
+
+## 3. EC2内部構成
 
 ```mermaid
 flowchart TB
@@ -105,7 +277,7 @@ flowchart TB
 
 ---
 
-## 3. 作業分担
+## 4. 作業分担
 
 ```mermaid
 flowchart LR
@@ -141,7 +313,7 @@ flowchart LR
 
 ---
 
-## 4. 案件ライフサイクル
+## 5. 案件ライフサイクル
 
 ```mermaid
 flowchart TB
@@ -175,7 +347,7 @@ flowchart TB
 
 ---
 
-## 5. 自動停止判定ロジック
+## 6. 自動停止判定ロジック
 
 ```mermaid
 flowchart TB
@@ -207,25 +379,25 @@ flowchart TB
 
 ---
 
-## 6. コスト構造
+## 7. コスト構造
 
 ```mermaid
 pie showData
-    title "24時間稼働時 月額コスト $11.1（スポット）"
-    "EC2 (t4g.small スポット)" : 5.0
-    "EBS (30GB gp3)" : 2.88
+    title "24時間稼働時 月額コスト $5.4（スポット）"
+    "EC2 (t4g.small スポット $0.0035/h)" : 2.52
+    "EBS (30GB gp3 $0.096/GB)" : 2.88
 ```
 
 ```mermaid
 pie showData
-    title "自動停止運用時 月額コスト 約$7"
-    "EC2 (実稼働分)" : 4
+    title "自動停止運用時 月額コスト 約$4（8h/日）"
+    "EC2 (実稼働分)" : 0.84
     "EBS (30GB gp3)" : 2.88
 ```
 
 ---
 
-## 7. ファイル構成
+## 8. ファイル構成
 
 ```mermaid
 flowchart LR
@@ -245,7 +417,7 @@ flowchart LR
 
 ---
 
-## 8. ネットワーク構成
+## 9. ネットワーク構成
 
 ```mermaid
 flowchart TB
@@ -283,7 +455,7 @@ flowchart TB
 
 ---
 
-## 9. AWS権限構成（3段階）
+## 10. AWS権限構成（3段階）
 
 ```mermaid
 flowchart TB
@@ -318,7 +490,7 @@ flowchart TB
 
 ---
 
-## 10. コントロールEC2からの案件管理
+## 11. コントロールEC2からの案件管理
 
 ```mermaid
 flowchart LR
