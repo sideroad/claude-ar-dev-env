@@ -197,12 +197,14 @@ stop-all           # 全案件停止
 
 | ファイル | 用途 | 使用場所 |
 |----------|------|----------|
-| `00-architecture-diagrams.html` | 構成図 | 📖 参照用 |
-| `01-human-prerequisites.md` | 事前作業ガイド | 👤 人（参照） |
-| `02-control-ec2-setup.md` | コントロールEC2構築 | 🤖 ローカルPC（初回のみ） |
-| `03-claude-code-new-project-setup.md` | 案件EC2セットアップ | 🤖 コントロールEC2 |
-| `04-claude-code-operations.md` | 運用タスク詳細 | 🤖 コントロールEC2 |
-| `05-scenario-guide.md` | シナリオガイド | 📖 参照用 |
+| [00-architecture-diagrams.md](./00-architecture-diagrams.md) | 構成図（Mermaid版） | 📖 参照用 |
+| [00-architecture-diagrams-d3.html](./00-architecture-diagrams-d3.html) | 構成図（D3.js版・インタラクティブ） | 📖 参照用 |
+| [01-human-prerequisites.md](./01-human-prerequisites.md) | 事前作業ガイド | 👤 人（参照） |
+| [02-control-ec2-setup.md](./02-control-ec2-setup.md) | コントロールEC2構築 | 🤖 ローカルPC（初回のみ） |
+| [03-claude-code-new-project-setup.md](./03-claude-code-new-project-setup.md) | 案件EC2セットアップ | 🤖 コントロールEC2 |
+| [04-claude-code-operations.md](./04-claude-code-operations.md) | 運用タスク詳細 | 🤖 コントロールEC2 |
+| [05-scenario-guide.md](./05-scenario-guide.md) | シナリオガイド | 📖 参照用 |
+| [sprites-dev-comparison.md](./sprites-dev-comparison.md) | Sprites.dev比較調査 | 📖 参照用 |
 
 ---
 
